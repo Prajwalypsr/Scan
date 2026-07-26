@@ -1,0 +1,1024 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiskInsight — see what your folders are holding</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#F2F5F9;
+    --card:#FFFFFF;
+    --ink:#141E2B;
+    --ink-2:#5C6A7B;
+    --ink-3:#8B98A8;
+    --line:#E1E7EF;
+    --line-strong:#CBD5E1;
+    --accent:#3A4FC4;
+    --accent-soft:#EAEDFB;
+    --flag:#B26A05;
+    --flag-soft:#FDF3E2;
+
+    --c-video:#4C6FE7;
+    --c-archive:#7B5EC7;
+    --c-installer:#C97A0A;
+    --c-document:#12938F;
+    --c-image:#CB5F84;
+    --c-audio:#6F9A4C;
+    --c-temp:#94A2B3;
+    --c-other:#B9C2CE;
+
+    --r:10px;
+    --shadow:0 1px 2px rgba(20,30,43,.05), 0 8px 24px -16px rgba(20,30,43,.18);
+    --display:"Bricolage Grotesque","Public Sans",system-ui,sans-serif;
+    --body:"Public Sans",system-ui,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px 80px}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:40;
+  }
+  .topbar-in{
+    max-width:1120px;margin:0 auto;padding:14px 24px;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .brand-mark{
+    width:26px;height:26px;border-radius:6px;flex:none;
+    background:var(--ink);
+    display:grid;grid-template-rows:repeat(4,1fr);gap:2px;padding:5px 4px;
+  }
+  .brand-mark i{display:block;background:#fff;border-radius:1px;height:2px}
+  .brand-mark i:nth-child(1){width:100%}
+  .brand-mark i:nth-child(2){width:60%}
+  .brand-mark i:nth-child(3){width:85%}
+  .brand-mark i:nth-child(4){width:35%}
+  .brand-name{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.02em}
+
+  .folder-field{display:flex;align-items:center;gap:8px}
+  .folder-field label{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  select.folder{
+    background:var(--paper);border:1px solid var(--line-strong);border-radius:8px;
+    padding:8px 10px;font-family:var(--mono);font-size:13px;min-width:210px;
+  }
+  .btn{
+    border:1px solid transparent;border-radius:8px;padding:9px 16px;font-weight:600;font-size:14px;
+    background:var(--accent);color:#fff;
+  }
+  .btn:hover{background:#31429F}
+  .btn.ghost{background:var(--card);border-color:var(--line-strong);color:var(--ink)}
+  .btn.ghost:hover{background:var(--paper)}
+  .btn.small{padding:6px 12px;font-size:13px}
+  .btn[disabled]{opacity:.45;cursor:not-allowed}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 28px;padding-top:26px}
+  .tab{
+    background:none;border:0;padding:10px 2px;margin-right:26px;
+    font-weight:600;color:var(--ink-3);border-bottom:2px solid transparent;
+    margin-bottom:-1px;font-size:14.5px;
+  }
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab:hover{color:var(--ink)}
+  .tab .count{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-left:5px}
+
+  /* ---------- hero / tape ---------- */
+  .hero{padding:8px 0 4px}
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;color:var(--ink-2);
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--line-strong);flex:none}
+  .headline{
+    font-family:var(--display);font-weight:700;letter-spacing:-.03em;
+    font-size:clamp(34px,6vw,52px);line-height:1.02;margin:10px 0 4px;
+  }
+  .headline .num{font-variant-numeric:tabular-nums}
+  .headline .sub{color:var(--ink-3);font-weight:500}
+  .hero-note{color:var(--ink-2);font-size:14px;max-width:56ch}
+
+  /* the measuring tape — signature element */
+  .tape-block{margin:30px 0 8px}
+  .tape{
+    display:flex;height:52px;border-radius:6px;overflow:hidden;
+    background:var(--card);border:1px solid var(--line);
+  }
+  .seg{
+    position:relative;min-width:4px;border-right:1px solid rgba(255,255,255,.75);
+    transition:filter .15s ease;
+  }
+  .seg:last-child{border-right:0}
+  .seg:hover,.seg.on{filter:brightness(1.08)}
+  .seg.hatch{
+    background-image:repeating-linear-gradient(-45deg,rgba(255,255,255,.5) 0 3px,transparent 3px 7px);
+  }
+  .ruler{position:relative;height:26px;margin-top:0}
+  .ruler .tick{position:absolute;top:0;transform:translateX(-50%);text-align:center}
+  .ruler .tick span{
+    display:block;width:1px;height:6px;background:var(--line-strong);margin:0 auto 4px;
+  }
+  .ruler .tick b{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-3);white-space:nowrap}
+  .ruler .tick:first-child{transform:none}
+  .ruler .tick:first-child b{text-align:left}
+  .ruler .tick:last-child{transform:translateX(-100%)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{
+    display:flex;align-items:center;gap:8px;background:var(--card);
+    border:1px solid var(--line);border-radius:999px;padding:6px 13px 6px 9px;font-size:13px;
+  }
+  .chip:hover{border-color:var(--line-strong)}
+  .chip .sw{width:9px;height:9px;border-radius:2px;flex:none}
+  .chip b{font-weight:600}
+  .chip em{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+
+  /* ---------- cards / grid ---------- */
+  .section-head{display:flex;align-items:baseline;gap:12px;margin:44px 0 14px;flex-wrap:wrap}
+  h2{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.02em;margin:0}
+  .section-head p{margin:0;color:var(--ink-2);font-size:13.5px}
+
+  .grid{display:grid;gap:14px}
+  .grid.stats{grid-template-columns:repeat(auto-fit,minmax(178px,1fr))}
+  .grid.two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+  .stat .k{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+  .stat .v{font-family:var(--display);font-weight:700;font-size:29px;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+  .stat .m{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .stat.flagged{background:var(--flag-soft);border-color:#F0DFC0}
+  .stat.flagged .v{color:var(--flag)}
+
+  /* rule result cards */
+  .rule-card{display:flex;flex-direction:column;gap:10px}
+  .rule-card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .rule-name{font-weight:600;font-size:15px}
+  .rule-desc{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:3px}
+  .rule-hit{font-family:var(--display);font-weight:700;font-size:24px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rule-hit small{font-family:var(--body);font-size:12px;font-weight:500;color:var(--ink-2);display:block;text-align:right}
+  .bar{height:6px;background:var(--paper);border-radius:3px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--flag);border-radius:3px}
+
+  .notice{
+    display:flex;gap:11px;background:var(--card);border:1px solid var(--line);
+    border-left:3px solid var(--ink);border-radius:8px;padding:13px 16px;margin-top:16px;font-size:13.5px;color:var(--ink-2);
+  }
+  .notice b{color:var(--ink)}
+
+  /* ---------- toolbar + table ---------- */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .search{position:relative;flex:1 1 240px}
+  .search input{
+    width:100%;background:var(--card);border:1px solid var(--line-strong);border-radius:8px;
+    padding:9px 12px 9px 34px;font-size:14px;
+  }
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+  select.f{background:var(--card);border:1px solid var(--line-strong);border-radius:8px;padding:9px 11px;font-size:13.5px}
+  .toggle{
+    display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line-strong);
+    border-radius:8px;padding:9px 12px;font-size:13.5px;user-select:none;
+  }
+
+  .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th{
+    text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-2);
+    font-weight:600;padding:11px 14px;border-bottom:1px solid var(--line);background:#FAFBFD;white-space:nowrap;
+  }
+  th.sortable{cursor:pointer}
+  th.sortable:hover{color:var(--ink)}
+  th .arrow{opacity:.45;font-size:10px}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#FAFBFD}
+  tbody tr.sel{background:var(--accent-soft)}
+  .fname{display:flex;align-items:center;gap:10px;min-width:0}
+  .ftype{
+    width:34px;height:22px;border-radius:4px;flex:none;display:grid;place-items:center;
+    font-family:var(--mono);font-size:9.5px;font-weight:600;color:#fff;letter-spacing:.03em;
+  }
+  .fname .t{min-width:0}
+  .fname .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34ch;display:block}
+  .fname .p{font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38ch;display:block}
+  .size-cell{white-space:nowrap}
+  .size-num{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+  .size-bar{height:4px;border-radius:2px;background:var(--paper);margin-top:5px;width:88px;overflow:hidden}
+  .size-bar i{display:block;height:100%;border-radius:2px}
+  .age{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+  .tag{
+    display:inline-flex;align-items:center;gap:5px;background:var(--flag-soft);color:var(--flag);
+    border:1px solid #F0DFC0;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap;
+  }
+  .tag .d{width:5px;height:5px;border-radius:50%;background:var(--flag)}
+  .why{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:block}
+  input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+
+  .empty{padding:52px 20px;text-align:center;color:var(--ink-2)}
+  .empty b{display:block;font-family:var(--display);font-size:17px;color:var(--ink);margin-bottom:5px}
+  .more{padding:14px;text-align:center;border-top:1px solid var(--line)}
+
+  /* selection bar */
+  .selbar{
+    position:sticky;bottom:16px;margin-top:16px;background:var(--ink);color:#fff;border-radius:10px;
+    padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:var(--shadow);
+  }
+  .selbar .s{font-family:var(--mono);font-size:13px}
+  .selbar .s b{font-family:var(--body);font-weight:600}
+  .selbar .spacer{margin-left:auto}
+  .selbar .btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+  .selbar .btn.ghost:hover{background:rgba(255,255,255,.12)}
+
+  /* ---------- rules view ---------- */
+  .rule-row{
+    display:flex;gap:16px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;
+  }
+  .rule-row:last-child{border-bottom:0}
+  .rule-row .info{flex:1 1 260px;min-width:0}
+  .rule-row.off .info{opacity:.5}
+  .sw-toggle{
+    position:relative;width:38px;height:22px;border-radius:11px;background:var(--line-strong);
+    border:0;flex:none;transition:background .15s;
+  }
+  .sw-toggle[aria-pressed="true"]{background:var(--accent)}
+  .sw-toggle::after{
+    content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+    background:#fff;transition:transform .15s;
+  }
+  .sw-toggle[aria-pressed="true"]::after{transform:translateX(16px)}
+  .matchcount{font-family:var(--mono);font-size:13px;color:var(--ink-2);white-space:nowrap}
+  .matchcount b{color:var(--flag);font-weight:600}
+
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .field input,.field select{
+    width:100%;background:var(--paper);border:1px solid var(--line-strong);border-radius:8px;padding:9px 11px;font-size:14px;
+  }
+  .field .hint{font-size:12px;color:var(--ink-3);margin-top:5px}
+  .field.bad input{border-color:#C0392B;background:#FDF2F1}
+  .err{color:#C0392B;font-size:12.5px;margin-top:8px;display:none}
+  .err.on{display:block}
+  .row-2{display:flex;gap:10px}
+  .row-2 input{flex:1}
+  .row-2 select{width:82px;flex:none}
+
+  /* ---------- history ---------- */
+  .hist{display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .hist:last-child{border-bottom:0}
+  .hist .when{font-family:var(--mono);font-size:13px;width:150px;flex:none}
+  .hist .folder{font-weight:600;flex:1 1 160px}
+  .hist .n{font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+  .hist .delta{font-family:var(--mono);font-size:12.5px;padding:2px 8px;border-radius:999px;background:var(--paper);color:var(--ink-2)}
+  .hist .delta.up{background:var(--flag-soft);color:var(--flag)}
+  .hist .delta.down{background:#E9F4EC;color:#3F7A4E}
+
+  /* ---------- scanning ---------- */
+  .scanner{padding:70px 0;text-align:center}
+  .scanner .title{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.02em}
+  .scanner .path{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:8px;height:18px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:520px;margin-inline:auto}
+  .scanbar{max-width:420px;height:6px;background:var(--card);border:1px solid var(--line);border-radius:4px;margin:20px auto 0;overflow:hidden}
+  .scanbar i{display:block;height:100%;background:var(--accent);width:0}
+
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-3);font-size:12.5px;
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  footer .mono{font-family:var(--mono)}
+
+  .tip{
+    position:fixed;z-index:60;background:var(--ink);color:#fff;border-radius:7px;padding:8px 11px;
+    font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .12s;white-space:nowrap;
+  }
+  .tip .tn{font-weight:600}
+  .tip .tv{font-family:var(--mono);opacity:.8;font-size:11.5px}
+  .tip.on{opacity:1}
+
+  .hide{display:none !important}
+
+  @media (max-width:720px){
+    .wrap{padding:0 16px 60px}
+    .topbar-in{padding:12px 16px}
+    .folder-field{flex:1 1 100%}
+    select.folder{flex:1;min-width:0}
+    .fname .p{display:none}
+    .hide-sm{display:none}
+    .size-bar{width:56px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;animation:none !important}
+  }
+</style>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="brand-mark"><i></i><i></i><i></i><i></i></div>
+      <div class="brand-name">DiskInsight</div>
+    </div>
+    <div class="folder-field">
+      <label for="folder">Folder</label>
+      <select class="folder" id="folder">
+        <option value="downloads">~/Downloads</option>
+        <option value="desktop">~/Desktop</option>
+        <option value="documents">~/Documents</option>
+        <option value="videos">~/Videos</option>
+      </select>
+    </div>
+    <button class="btn" id="scanBtn">Scan folder</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" aria-selected="true" data-view="overview">Overview</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="files">Files <span class="count" id="tabFiles"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-view="rules">Rules <span class="count" id="tabRules"></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-view="history">Scan history</button>
+  </nav>
+
+  <!-- scanning state -->
+  <section id="scanning" class="scanner hide">
+    <div class="title">Reading folder…</div>
+    <div class="path" id="scanPath"></div>
+    <div class="scanbar"><i id="scanFill"></i></div>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section id="view-overview">
+    <div class="hero">
+      <div class="eyebrow">
+        <span id="heroPath">~/Downloads</span>
+        <span class="dot"></span>
+        <span id="heroWhen">scanned just now</span>
+        <span class="dot"></span>
+        <span id="heroDepth">including subfolders</span>
+      </div>
+      <h1 class="headline"><span class="num" id="heroSize">—</span> <span class="sub">across <span id="heroCount">—</span> files</span></h1>
+      <p class="hero-note">Every block below is one file type, sized by how much space it takes. Hover a block to see the type; click it to open that group in the file list.</p>
+    </div>
+
+    <div class="tape-block">
+      <div class="tape" id="tape"></div>
+      <div class="ruler" id="ruler"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="section-head">
+      <h2>At a glance</h2>
+      <p>Counts for the groups people usually clear out first.</p>
+    </div>
+    <div class="grid stats" id="stats"></div>
+
+    <div class="section-head">
+      <h2>Recommended for cleanup</h2>
+      <p>Files matched by your active rules.</p>
+    </div>
+    <div class="grid two" id="ruleCards"></div>
+    <div class="notice">
+      <div>
+        <b>DiskInsight never deletes anything.</b> It only points at files worth a second look. Open the file list to review a group, and decide for yourself what stays.
+      </div>
+    </div>
+  </section>
+
+  <!-- FILES -->
+  <section id="view-files" class="hide">
+    <div class="section-head" style="margin-top:0">
+      <h2>Files</h2>
+      <p id="filesSummary"></p>
+    </div>
+    <div class="toolbar">
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Search by file name or folder" autocomplete="off">
+      </div>
+      <select class="f" id="fType"><option value="">All types</option></select>
+      <select class="f" id="fSize">
+        <option value="0">Any size</option>
+        <option value="10485760">Over 10 MB</option>
+        <option value="104857600">Over 100 MB</option>
+        <option value="524288000">Over 500 MB</option>
+        <option value="1073741824">Over 1 GB</option>
+      </select>
+      <select class="f" id="fAge">
+        <option value="0">Any age</option>
+        <option value="30">Older than 30 days</option>
+        <option value="90">Older than 90 days</option>
+        <option value="180">Older than 6 months</option>
+        <option value="365">Older than 1 year</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="fFlag"> Only cleanup matches</label>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34px"><input type="checkbox" id="selAll" aria-label="Select all visible files"></th>
+            <th class="sortable" data-sort="name">Name <span class="arrow"></span></th>
+            <th class="sortable" data-sort="size" style="width:150px">Size <span class="arrow"></span></th>
+            <th class="sortable hide-sm" data-sort="modified" style="width:140px">Last modified <span class="arrow"></span></th>
+            <th style="width:210px">Status</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="more hide" id="moreWrap">
+        <button class="btn ghost small" id="moreBtn">Show 50 more</button>
+      </div>
+    </div>
+    <div class="selbar hide" id="selbar">
+      <span class="s"><b id="selCount">0 files</b> selected · <span id="selSize">0 B</span></span>
+      <span class="spacer"></span>
+      <button class="btn ghost small" id="copyPaths">Copy file paths</button>
+      <button class="btn ghost small" id="clearSel">Clear selection</button>
+    </div>
+  </section>
+
+  <!-- RULES -->
+  <section id="view-rules" class="hide">
+    <div class="section-head" style="margin-top:0">
+      <h2>Cleanup rules</h2>
+      <p>A rule describes files worth reviewing. Turn one off to stop flagging its matches.</p>
+    </div>
+    <div class="card" style="padding:0" id="rulesList"></div>
+
+    <div class="section-head">
+      <h2>Add a rule</h2>
+      <p>Leave a condition blank to ignore it.</p>
+    </div>
+    <div class="card">
+      <div class="form-grid">
+        <div class="field" id="fldName">
+          <label for="rName">Rule name</label>
+          <input id="rName" placeholder="Old screen recordings">
+        </div>
+        <div class="field">
+          <label for="rExt">File types</label>
+          <input id="rExt" placeholder="mp4, mov">
+          <div class="hint">Comma separated, no dots</div>
+        </div>
+        <div class="field">
+          <label for="rSize">Larger than</label>
+          <div class="row-2">
+            <input id="rSize" type="number" min="0" step="any" placeholder="500">
+            <select id="rUnit"><option>MB</option><option>GB</option><option>KB</option></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="rAge">Older than</label>
+          <div class="row-2">
+            <input id="rAge" type="number" min="0" step="1" placeholder="30">
+            <select disabled style="width:82px"><option>days</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="err" id="rErr"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="addRule">Add rule</button>
+        <span class="matchcount" id="rPreview"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="view-history" class="hide">
+    <div class="section-head" style="margin-top:0">
+      <h2>Scan history</h2>
+      <p>Saved scans, so you can see whether a folder is growing.</p>
+    </div>
+    <div class="card" style="padding:0" id="histList"></div>
+  </section>
+
+  <footer>
+    <span class="mono">DiskInsight</span>
+    <span class="dot"></span>
+    <span>Front-end preview with sample data — no files are read, moved or deleted.</span>
+  </footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   DiskInsight — front-end preview
+   Sample data is generated locally so every number on screen is
+   internally consistent. Swap generateDataset() for your API call.
+------------------------------------------------------------------- */
+
+const KB=1024, MB=KB*1024, GB=MB*1024, DAY=86400000;
+
+const CATS = {
+  video:    {label:'Videos',          color:'var(--c-video)',     raw:'#4C6FE7', exts:['mp4','mkv','mov','avi']},
+  archive:  {label:'Archives',        color:'var(--c-archive)',   raw:'#7B5EC7', exts:['zip','rar','7z','tar']},
+  installer:{label:'Installers',      color:'var(--c-installer)', raw:'#C97A0A', exts:['exe','msi','dmg','deb']},
+  document: {label:'Documents',       color:'var(--c-document)',  raw:'#12938F', exts:['pdf','docx','xlsx','pptx','csv']},
+  image:    {label:'Images',          color:'var(--c-image)',     raw:'#CB5F84', exts:['jpg','png','heic','svg','psd']},
+  audio:    {label:'Audio',           color:'var(--c-audio)',     raw:'#6F9A4C', exts:['mp3','wav','m4a']},
+  temp:     {label:'Temporary files', color:'var(--c-temp)',      raw:'#94A2B3', exts:['tmp','part','crdownload','log']},
+  other:    {label:'Everything else', color:'var(--c-other)',     raw:'#B9C2CE', exts:['json','txt','dll','iso','ttf']}
+};
+const EXT2CAT = {};
+for (const [k,v] of Object.entries(CATS)) v.exts.forEach(e => EXT2CAT[e]=k);
+
+const FOLDERS = {
+  downloads:{path:'~/Downloads', seed:7, count:842, subs:['','Invoices','Chrome','Unpacked','2024 archive']},
+  desktop:  {path:'~/Desktop',   seed:19, count:214, subs:['','Screenshots','To sort']},
+  documents:{path:'~/Documents', seed:31, count:1106, subs:['','Work','Taxes','Notes','Scans','Old laptop']},
+  videos:   {path:'~/Videos',    seed:53, count:96,  subs:['','Recordings','Exports']}
+};
+
+/* seeded RNG so a folder always looks the same between visits */
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+const WORDS = ['report','invoice','backup','setup','draft','final','holiday','budget','screen','recording',
+  'presentation','photo','scan','export','statement','recipe','resume','notes','contract','demo','logo',
+  'meeting','tutorial','wallpaper','receipt','album','archive','update','installer','sample','render','clip'];
+const SUFFIX = ['','_final','_v2','_v3','(1)','(2)','_old','_copy','_2024','_2025','_draft','-compressed'];
+
+function generateDataset(key){
+  const cfg = FOLDERS[key], r = rng(cfg.seed);
+  const pick = arr => arr[Math.floor(r()*arr.length)];
+  // how the file count is split across categories
+  const mix = key==='videos'
+    ? {video:.62,archive:.05,installer:.01,document:.04,image:.14,audio:.06,temp:.05,other:.03}
+    : key==='documents'
+    ? {video:.03,archive:.06,installer:.02,document:.52,image:.20,audio:.03,temp:.06,other:.08}
+    : {video:.10,archive:.08,installer:.06,document:.22,image:.28,audio:.07,temp:.09,other:.10};
+  const sizeRange = {
+    video:[120*MB,4.2*GB], archive:[8*MB,2.6*GB], installer:[14*MB,1.4*GB],
+    document:[40*KB,90*MB], image:[180*KB,26*MB], audio:[2*MB,180*MB],
+    temp:[1*KB,900*MB], other:[2*KB,3.1*GB]
+  };
+  const files=[]; let id=0;
+  const cats=Object.keys(mix);
+  for(const c of cats){
+    const n = Math.round(cfg.count*mix[c]);
+    for(let i=0;i<n;i++){
+      const ext = pick(CATS[c].exts);
+      const [lo,hi] = sizeRange[c];
+      // skew small: most files are little, a few are huge
+      const skew = Math.pow(r(), c==='image'||c==='document' ? 3.4 : 2.1);
+      const size = Math.max(512, Math.round(lo + skew*(hi-lo)));
+      const age = Math.round(Math.pow(r(),1.7) * 900); // days old, skewed recent
+      const sub = pick(cfg.subs);
+      const name = pick(WORDS) + (r()<.5 ? '-'+pick(WORDS) : '') + pick(SUFFIX) + '.' + ext;
+      files.push({
+        id:++id, name, ext, cat:c, size,
+        modified: Date.now() - age*DAY - Math.round(r()*DAY),
+        path: cfg.path + (sub ? '/'+sub : '')
+      });
+    }
+  }
+  return files;
+}
+
+/* ---------------- state ---------------- */
+const DEFAULT_RULES = [
+  {id:1,name:'Very large files',        on:true,  ext:[],                              minSize:1*GB,   olderThan:0},
+  {id:2,name:'Stale temporary files',   on:true,  ext:['tmp','part','crdownload','log'],minSize:0,     olderThan:30},
+  {id:3,name:'Old archives',            on:true,  ext:['zip','rar','7z'],              minSize:0,      olderThan:180},
+  {id:4,name:'Installers you kept',     on:true,  ext:['exe','msi','dmg','deb'],       minSize:0,      olderThan:90},
+  {id:5,name:'Big videos over a year',  on:false, ext:['mp4','mkv','mov','avi'],       minSize:500*MB, olderThan:365}
+];
+
+const state = {
+  folderKey:'downloads',
+  files:[],
+  rules:DEFAULT_RULES.map(r=>({...r})),
+  view:'overview',
+  scannedAt:Date.now(),
+  q:'', fType:'', fSize:0, fAge:0, fFlag:false,
+  sort:'size', dir:-1,
+  limit:50,
+  sel:new Set()
+};
+
+/* ---------------- helpers ---------------- */
+function fmt(b){
+  if(b>=GB) return (b/GB).toFixed(b>=10*GB?1:2)+' GB';
+  if(b>=MB) return (b/MB).toFixed(b>=10*MB?0:1)+' MB';
+  if(b>=KB) return Math.round(b/KB)+' KB';
+  return b+' B';
+}
+function ago(ts){
+  const d=Math.floor((Date.now()-ts)/DAY);
+  if(d<1) return 'today';
+  if(d===1) return 'yesterday';
+  if(d<30) return d+' days ago';
+  if(d<365){const m=Math.round(d/30);return m+(m===1?' month ago':' months ago')}
+  const y=(d/365);return y<1.5?'1 year ago':y.toFixed(0)+' years ago';
+}
+function daysOld(ts){return (Date.now()-ts)/DAY}
+function ruleText(r){
+  const p=[];
+  if(r.ext.length) p.push('.'+r.ext.join(', .'));
+  else p.push('any type');
+  if(r.minSize) p.push('larger than '+fmt(r.minSize));
+  if(r.olderThan) p.push('older than '+r.olderThan+' days');
+  return p.join(' · ');
+}
+function matches(f,r){
+  if(r.ext.length && !r.ext.includes(f.ext)) return false;
+  if(r.minSize && f.size < r.minSize) return false;
+  if(r.olderThan && daysOld(f.modified) < r.olderThan) return false;
+  return true;
+}
+function applyRules(){
+  const on = state.rules.filter(r=>r.on);
+  for(const f of state.files){
+    f.hits = on.filter(r=>matches(f,r));
+    f.flag = f.hits.length>0;
+  }
+}
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => {const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n};
+
+/* ---------------- tooltip ---------------- */
+const tip=$('#tip');
+function showTip(e,name,val){
+  tip.innerHTML='<div class="tn">'+name+'</div><div class="tv">'+val+'</div>';
+  tip.classList.add('on');
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX-r.width/2; x=Math.max(8,Math.min(x,innerWidth-r.width-8));
+  tip.style.left=x+'px'; tip.style.top=(e.clientY-r.height-12)+'px';
+}
+function hideTip(){tip.classList.remove('on')}
+
+/* ---------------- overview ---------------- */
+function byCat(){
+  const m={};
+  for(const k of Object.keys(CATS)) m[k]={n:0,size:0};
+  for(const f of state.files){m[f.cat].n++;m[f.cat].size+=f.size}
+  return m;
+}
+function renderOverview(){
+  const total = state.files.reduce((a,f)=>a+f.size,0);
+  const cat = byCat();
+  const order = Object.keys(CATS).sort((a,b)=>cat[b].size-cat[a].size);
+
+  $('#heroSize').textContent = fmt(total);
+  $('#heroCount').textContent = state.files.length.toLocaleString();
+  $('#heroPath').textContent = FOLDERS[state.folderKey].path;
+  $('#heroWhen').textContent = 'scanned '+ago(state.scannedAt);
+
+  // the tape
+  const tape=$('#tape'); tape.innerHTML='';
+  order.forEach(k=>{
+    if(!cat[k].size) return;
+    const pct = cat[k].size/total*100;
+    const s = el('button','seg'+(k==='temp'?' hatch':''));
+    s.style.flex = pct+' 1 0';
+    s.style.background = CATS[k].raw;
+    s.setAttribute('aria-label', CATS[k].label+', '+fmt(cat[k].size));
+    s.addEventListener('mousemove',e=>showTip(e,CATS[k].label,fmt(cat[k].size)+' · '+cat[k].n+' files · '+pct.toFixed(1)+'%'));
+    s.addEventListener('mouseleave',hideTip);
+    s.addEventListener('click',()=>{hideTip();state.fType=k;$('#fType').value=k;setView('files')});
+    tape.appendChild(s);
+  });
+
+  // the ruler under it
+  const ruler=$('#ruler'); ruler.innerHTML='';
+  for(let i=0;i<=4;i++){
+    const t=el('div','tick'); t.style.left=(i*25)+'%';
+    t.innerHTML='<span></span><b>'+(i===0?'0':fmt(total*i/4))+'</b>';
+    ruler.appendChild(t);
+  }
+
+  // legend
+  const legend=$('#legend'); legend.innerHTML='';
+  order.forEach(k=>{
+    if(!cat[k].n) return;
+    const c=el('button','chip');
+    c.innerHTML='<span class="sw" style="background:'+CATS[k].raw+'"></span><b>'+CATS[k].label+'</b><em>'+fmt(cat[k].size)+' · '+cat[k].n+'</em>';
+    c.addEventListener('click',()=>{state.fType=k;$('#fType').value=k;setView('files')});
+    legend.appendChild(c);
+  });
+
+  // at a glance
+  const big = state.files.filter(f=>f.size>500*MB);
+  const tmp = state.files.filter(f=>f.cat==='temp');
+  const zip = state.files.filter(f=>f.ext==='zip');
+  const pdf = state.files.filter(f=>f.ext==='pdf');
+  const flagged = state.files.filter(f=>f.flag);
+  const stats=[
+    {k:'Total files',v:state.files.length.toLocaleString(),m:fmt(total)+' in total'},
+    {k:'Over 500 MB',v:big.length,m:fmt(big.reduce((a,f)=>a+f.size,0))+' between them'},
+    {k:'Temporary files',v:tmp.length,m:'.tmp .part .log · '+fmt(tmp.reduce((a,f)=>a+f.size,0))},
+    {k:'ZIP files',v:zip.length,m:fmt(zip.reduce((a,f)=>a+f.size,0))},
+    {k:'PDF files',v:pdf.length,m:fmt(pdf.reduce((a,f)=>a+f.size,0))},
+    {k:'Worth reviewing',v:flagged.length,m:fmt(flagged.reduce((a,f)=>a+f.size,0))+' could be freed',flag:true}
+  ];
+  const sw=$('#stats'); sw.innerHTML='';
+  stats.forEach(s=>{
+    sw.appendChild(el('div','card stat'+(s.flag?' flagged':''),
+      '<div class="k">'+s.k+'</div><div class="v">'+s.v+'</div><div class="m">'+s.m+'</div>'));
+  });
+
+  // rule cards
+  const rc=$('#ruleCards'); rc.innerHTML='';
+  const active = state.rules.filter(r=>r.on);
+  if(!active.length){
+    rc.appendChild(el('div','card','<div class="empty" style="padding:24px"><b>No rules are switched on</b>Turn on a rule to start flagging files.</div>'));
+  }
+  active.forEach(r=>{
+    const hit = state.files.filter(f=>matches(f,r));
+    const size = hit.reduce((a,f)=>a+f.size,0);
+    const card = el('div','card rule-card');
+    card.innerHTML =
+      '<div class="top"><div><div class="rule-name">'+r.name+'</div><div class="rule-desc">'+ruleText(r)+'</div></div>'+
+      '<div class="rule-hit">'+hit.length+'<small>files</small></div></div>'+
+      '<div class="bar"><i style="width:'+Math.min(100,size/total*100).toFixed(1)+'%"></i></div>'+
+      '<div style="font-size:13px;color:var(--ink-2)">'+fmt(size)+' — '+(total?(size/total*100).toFixed(1):0)+'% of this folder</div>';
+    const b=el('button','btn ghost small','Review these files');
+    b.style.alignSelf='flex-start';
+    b.addEventListener('click',()=>{resetFilters();state.fFlag=false;applyRuleFilter(r);setView('files')});
+    card.appendChild(b);
+    rc.appendChild(card);
+  });
+}
+function applyRuleFilter(r){
+  state.fType = r.ext.length===1 ? (EXT2CAT[r.ext[0]]||'') : '';
+  state.q = '';
+  state.fSize = r.minSize||0;
+  state.fAge = r.olderThan||0;
+  state.ruleFilter = r;
+  syncFilterInputs();
+}
+function resetFilters(){
+  state.q='';state.fType='';state.fSize=0;state.fAge=0;state.fFlag=false;state.ruleFilter=null;
+  syncFilterInputs();
+}
+function syncFilterInputs(){
+  $('#q').value=state.q; $('#fType').value=state.fType;
+  $('#fSize').value=String(state.fSize); $('#fAge').value=String(state.fAge);
+  $('#fFlag').checked=state.fFlag;
+}
+
+/* ---------------- files ---------------- */
+function visibleFiles(){
+  const q=state.q.trim().toLowerCase();
+  let out = state.files.filter(f=>{
+    if(state.ruleFilter && !matches(f,state.ruleFilter)) return false;
+    if(state.fType && f.cat!==state.fType) return false;
+    if(state.fSize && f.size<state.fSize) return false;
+    if(state.fAge && daysOld(f.modified)<state.fAge) return false;
+    if(state.fFlag && !f.flag) return false;
+    if(q && !(f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const s=state.sort,d=state.dir;
+  out.sort((a,b)=> s==='name' ? d*a.name.localeCompare(b.name) : d*(a[s]-b[s]));
+  return out;
+}
+function renderFiles(){
+  const list = visibleFiles();
+  const shown = list.slice(0,state.limit);
+  const totalSize = list.reduce((a,f)=>a+f.size,0);
+  const max = list.length ? Math.max(...list.map(f=>f.size)) : 1;
+
+  $('#filesSummary').textContent =
+    list.length.toLocaleString()+' of '+state.files.length.toLocaleString()+' files · '+fmt(totalSize)+
+    (state.ruleFilter ? ' · filtered by rule "'+state.ruleFilter.name+'"' : '');
+
+  const tb=$('#rows'); tb.innerHTML='';
+  if(!list.length){
+    tb.appendChild(el('tr',null,'<td colspan="5"><div class="empty"><b>No files match these filters</b>Try clearing the search box or widening the size and age filters.</div></td>'));
+    $('#moreWrap').classList.add('hide');
+  } else {
+    shown.forEach(f=>{
+      const tr=el('tr');
+      if(state.sel.has(f.id)) tr.className='sel';
+      const ext = f.ext.length>4 ? f.ext.slice(0,4) : f.ext;
+      tr.innerHTML=
+        '<td><input type="checkbox" data-id="'+f.id+'" '+(state.sel.has(f.id)?'checked':'')+' aria-label="Select '+f.name+'"></td>'+
+        '<td><div class="fname"><span class="ftype" style="background:'+CATS[f.cat].raw+'">'+ext.toUpperCase()+'</span>'+
+          '<span class="t"><span class="n">'+f.name+'</span><span class="p">'+f.path+'</span></span></div></td>'+
+        '<td class="size-cell"><span class="size-num">'+fmt(f.size)+'</span>'+
+          '<span class="size-bar"><i style="width:'+Math.max(3,f.size/max*100).toFixed(1)+'%;background:'+CATS[f.cat].raw+'"></i></span></td>'+
+        '<td class="hide-sm"><span class="age">'+ago(f.modified)+'</span></td>'+
+        '<td>'+(f.flag
+          ? '<span class="tag"><span class="d"></span>Recommended for cleanup</span><span class="why">'+f.hits.map(h=>h.name).join(', ')+'</span>'
+          : '<span style="color:var(--ink-3);font-size:13px">Keep</span>')+'</td>';
+      tb.appendChild(tr);
+    });
+    const remain = list.length - shown.length;
+    $('#moreWrap').classList.toggle('hide', remain<=0);
+    $('#moreBtn').textContent = 'Show '+Math.min(50,remain)+' more';
+  }
+  $('#selAll').checked = shown.length>0 && shown.every(f=>state.sel.has(f.id));
+  renderSelbar();
+}
+function renderSelbar(){
+  const bar=$('#selbar');
+  if(!state.sel.size){bar.classList.add('hide');return}
+  const sel = state.files.filter(f=>state.sel.has(f.id));
+  $('#selCount').textContent = sel.length+(sel.length===1?' file':' files');
+  $('#selSize').textContent = fmt(sel.reduce((a,f)=>a+f.size,0));
+  bar.classList.remove('hide');
+}
+
+/* ---------------- rules view ---------------- */
+function renderRules(){
+  const box=$('#rulesList'); box.innerHTML='';
+  state.rules.forEach(r=>{
+    const hit = state.files.filter(f=>matches(f,r));
+    const row=el('div','rule-row'+(r.on?'':' off'));
+    const t=el('button','sw-toggle'); t.setAttribute('aria-pressed',String(r.on));
+    t.setAttribute('aria-label','Turn rule '+r.name+(r.on?' off':' on'));
+    t.addEventListener('click',()=>{r.on=!r.on;applyRules();renderAll()});
+    row.appendChild(t);
+    row.appendChild(el('div','info','<div class="rule-name">'+r.name+'</div><div class="rule-desc">'+ruleText(r)+'</div>'));
+    row.appendChild(el('div','matchcount','<b>'+hit.length+'</b> files · '+fmt(hit.reduce((a,f)=>a+f.size,0))));
+    const del=el('button','btn ghost small','Delete rule');
+    del.addEventListener('click',()=>{state.rules=state.rules.filter(x=>x.id!==r.id);applyRules();renderAll()});
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+  if(!state.rules.length){
+    box.appendChild(el('div',null,'<div class="empty"><b>No rules yet</b>Add one below to start flagging files.</div>'));
+  }
+  $('#tabRules').textContent='('+state.rules.filter(r=>r.on).length+')';
+  previewRule();
+}
+function readRuleForm(){
+  const name=$('#rName').value.trim();
+  const ext=$('#rExt').value.split(',').map(s=>s.trim().replace(/^\./,'').toLowerCase()).filter(Boolean);
+  const sizeV=parseFloat($('#rSize').value);
+  const unit={KB:KB,MB:MB,GB:GB}[$('#rUnit').value];
+  const minSize=isNaN(sizeV)?0:Math.round(sizeV*unit);
+  const ageV=parseInt($('#rAge').value,10);
+  const olderThan=isNaN(ageV)?0:ageV;
+  return {name,ext,minSize,olderThan};
+}
+function previewRule(){
+  const r=readRuleForm();
+  if(!r.ext.length && !r.minSize && !r.olderThan){$('#rPreview').textContent='';return}
+  const n=state.files.filter(f=>matches(f,r)).length;
+  $('#rPreview').innerHTML='This would flag <b>'+n+'</b> of '+state.files.length+' files right now';
+}
+function addRule(){
+  const r=readRuleForm(), err=$('#rErr');
+  $('#fldName').classList.remove('bad');
+  if(!r.name){
+    $('#fldName').classList.add('bad');
+    err.textContent='Give the rule a name so you can recognise it later.';
+    err.classList.add('on'); $('#rName').focus(); return;
+  }
+  if(!r.ext.length && !r.minSize && !r.olderThan){
+    err.textContent='Set at least one condition — a file type, a size, or an age.';
+    err.classList.add('on'); return;
+  }
+  err.classList.remove('on');
+  state.rules.push({id:Date.now(),on:true,...r});
+  $('#rName').value='';$('#rExt').value='';$('#rSize').value='';$('#rAge').value='';
+  applyRules(); renderAll();
+}
+
+/* ---------------- history ---------------- */
+function renderHistory(){
+  const box=$('#histList'); box.innerHTML='';
+  const total=state.files.reduce((a,f)=>a+f.size,0);
+  const flagged=state.files.filter(f=>f.flag).reduce((a,f)=>a+f.size,0);
+  const path=FOLDERS[state.folderKey].path;
+  const r=rng(FOLDERS[state.folderKey].seed*3);
+  const rows=[{when:'Just now',size:total,n:state.files.length,free:flagged,delta:null}];
+  let s=total,n=state.files.length;
+  const labels=['3 days ago','2 weeks ago','1 month ago','3 months ago'];
+  labels.forEach(l=>{
+    const shrink=0.86+r()*0.11;
+    const prevS=Math.round(s*shrink), prevN=Math.round(n*(0.88+r()*0.09));
+    rows.push({when:l,size:prevS,n:prevN,free:Math.round(prevS*(0.1+r()*0.2)),delta:s-prevS});
+    s=prevS;n=prevN;
+  });
+  rows.forEach((row,i)=>{
+    const d=el('div','hist');
+    d.innerHTML='<span class="when">'+row.when+'</span>'+
+      '<span class="folder">'+path+'</span>'+
+      '<span class="n">'+row.n.toLocaleString()+' files</span>'+
+      '<span class="n">'+fmt(row.size)+'</span>'+
+      (i===0?'<span class="delta">latest</span>':'<span class="delta up">+'+fmt(row.delta)+' since</span>')+
+      '<span class="n" style="margin-left:auto">'+fmt(row.free)+' worth reviewing</span>';
+    box.appendChild(d);
+  });
+}
+
+/* ---------------- views ---------------- */
+function setView(v){
+  state.view=v;
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.view===v)));
+  ['overview','files','rules','history'].forEach(k=>$('#view-'+k).classList.toggle('hide',k!==v));
+  if(v==='files') renderFiles();
+  scrollTo({top:0,behavior:'smooth'});
+}
+function renderAll(){
+  renderOverview(); renderFiles(); renderRules(); renderHistory();
+  $('#tabFiles').textContent='('+state.files.length.toLocaleString()+')';
+}
+
+/* ---------------- scanning ---------------- */
+function scan(key){
+  state.folderKey=key;
+  state.sel.clear(); state.limit=50; resetFilters();
+  const cfg=FOLDERS[key];
+  const files=generateDataset(key);
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  ['overview','files','rules','history'].forEach(k=>$('#view-'+k).classList.add('hide'));
+  $('#scanning').classList.remove('hide');
+  $('#scanBtn').disabled=true;
+  $('#selbar').classList.add('hide');
+
+  const finish=()=>{
+    state.files=files; state.scannedAt=Date.now();
+    applyRules(); fillTypeFilter(); renderAll();
+    $('#scanning').classList.add('hide'); $('#scanBtn').disabled=false;
+    setView(state.view==='files'?'files':'overview');
+  };
+  if(reduce){finish();return}
+
+  let p=0;
+  const step=()=>{
+    p+=6+Math.random()*11;
+    $('#scanFill').style.width=Math.min(100,p)+'%';
+    const f=files[Math.floor(Math.random()*files.length)];
+    $('#scanPath').textContent=f.path+'/'+f.name;
+    if(p<100) setTimeout(step,70); else setTimeout(finish,180);
+  };
+  step();
+}
+function fillTypeFilter(){
+  const sel=$('#fType'); sel.innerHTML='<option value="">All types</option>';
+  const c=byCat();
+  Object.keys(CATS).filter(k=>c[k].n).sort((a,b)=>c[b].size-c[a].size).forEach(k=>{
+    sel.insertAdjacentHTML('beforeend','<option value="'+k+'">'+CATS[k].label+' ('+c[k].n+')</option>');
+  });
+  sel.value=state.fType;
+}
+
+/* ---------------- events ---------------- */
+$('#tabs').addEventListener('click',e=>{const t=e.target.closest('.tab'); if(t) setView(t.dataset.view)});
+$('#scanBtn').addEventListener('click',()=>scan($('#folder').value));
+$('#folder').addEventListener('change',e=>scan(e.target.value));
+
+$('#q').addEventListener('input',e=>{state.q=e.target.value;state.limit=50;renderFiles()});
+$('#fType').addEventListener('change',e=>{state.fType=e.target.value;state.ruleFilter=null;state.limit=50;renderFiles()});
+$('#fSize').addEventListener('change',e=>{state.fSize=+e.target.value;state.ruleFilter=null;state.limit=50;renderFiles()});
+$('#fAge').addEventListener('change',e=>{state.fAge=+e.target.value;state.ruleFilter=null;state.limit=50;renderFiles()});
+$('#fFlag').addEventListener('change',e=>{state.fFlag=e.target.checked;state.limit=50;renderFiles()});
+$('#moreBtn').addEventListener('click',()=>{state.limit+=50;renderFiles()});
+
+document.querySelectorAll('th.sortable').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.dataset.sort;
+    if(state.sort===k) state.dir*=-1; else {state.sort=k;state.dir=k==='name'?1:-1}
+    document.querySelectorAll('th.sortable .arrow').forEach(a=>a.textContent='');
+    th.querySelector('.arrow').textContent = state.dir===1?'▲':'▼';
+    renderFiles();
+  });
+});
+$('#rows').addEventListener('change',e=>{
+  const cb=e.target.closest('input[type=checkbox]'); if(!cb) return;
+  const id=+cb.dataset.id;
+  cb.checked?state.sel.add(id):state.sel.delete(id);
+  cb.closest('tr').classList.toggle('sel',cb.checked);
+  renderSelbar();
+});
+$('#selAll').addEventListener('change',e=>{
+  const shown=visibleFiles().slice(0,state.limit);
+  shown.forEach(f=>e.target.checked?state.sel.add(f.id):state.sel.delete(f.id));
+  renderFiles();
+});
+$('#clearSel').addEventListener('click',()=>{state.sel.clear();renderFiles()});
+$('#copyPaths').addEventListener('click',async e=>{
+  const txt=state.files.filter(f=>state.sel.has(f.id)).map(f=>f.path+'/'+f.name).join('\n');
+  try{await navigator.clipboard.writeText(txt);e.target.textContent='Copied';}
+  catch{e.target.textContent='Copy blocked by browser';}
+  setTimeout(()=>e.target.textContent='Copy file paths',1600);
+});
+$('#addRule').addEventListener('click',addRule);
+['#rName','#rExt','#rSize','#rAge','#rUnit'].forEach(s=>$(s).addEventListener('input',previewRule));
+$('#rUnit').addEventListener('change',previewRule);
+addEventListener('scroll',hideTip,{passive:true});
+
+/* ---------------- boot ---------------- */
+state.files=generateDataset('downloads');
+applyRules(); fillTypeFilter(); renderAll();
+document.querySelector('th[data-sort="size"] .arrow').textContent='▼';
+</script>
