@@ -1,4 +1,4 @@
-package diskinsight;
+package diskinsight.model;
 
 /** One completed scan, kept so a folder can be compared with itself over time. */
 public class ScanRecord {

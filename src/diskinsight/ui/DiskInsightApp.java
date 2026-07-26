@@ -1,4 +1,6 @@
-package diskinsight;
+package diskinsight.ui;
+
+import diskinsight.service.FolderScanner;
 
 import javax.swing.SwingUtilities;
 

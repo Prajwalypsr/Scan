@@ -1,4 +1,7 @@
-package diskinsight;
+package diskinsight.ui;
+
+import diskinsight.model.ScanRecord;
+import diskinsight.util.Fmt;
 
 import java.awt.*;
 import java.text.SimpleDateFormat;

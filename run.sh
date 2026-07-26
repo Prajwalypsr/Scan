@@ -11,7 +11,7 @@ fi
 
 echo "Compiling..."
 mkdir -p out
-javac -d out src/diskinsight/*.java
+javac -d out -sourcepath src src/diskinsight/ui/DiskInsightApp.java
 
 echo "Starting DiskInsight..."
-java -cp "$CP" diskinsight.DiskInsightApp
+java -cp "$CP" diskinsight.ui.DiskInsightApp

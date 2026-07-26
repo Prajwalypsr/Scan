@@ -1,4 +1,6 @@
-package diskinsight;
+package diskinsight.model;
+
+import diskinsight.util.Fmt;
 
 import java.util.ArrayList;
 import java.util.Arrays;

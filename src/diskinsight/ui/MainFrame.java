@@ -1,4 +1,13 @@
-package diskinsight;
+package diskinsight.ui;
+
+import diskinsight.dao.Database;
+import diskinsight.model.Category;
+import diskinsight.model.FileRecord;
+import diskinsight.model.Rule;
+import diskinsight.model.ScanRecord;
+import diskinsight.service.FolderScanner;
+import diskinsight.util.DemoData;
+import diskinsight.util.Fmt;
 
 import java.awt.*;
 import java.awt.event.*;

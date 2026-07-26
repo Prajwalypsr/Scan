@@ -1,4 +1,6 @@
-package diskinsight;
+package diskinsight.service;
+
+import diskinsight.model.FileRecord;
 
 import java.io.IOException;
 import java.nio.file.*;

@@ -1,4 +1,4 @@
-package diskinsight;
+package diskinsight.model;
 
 import java.util.ArrayList;
 import java.util.List;

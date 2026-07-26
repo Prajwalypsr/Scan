@@ -1,4 +1,4 @@
-package diskinsight;
+package diskinsight.ui;
 
 import java.awt.*;
 import java.awt.event.*;

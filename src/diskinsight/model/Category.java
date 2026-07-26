@@ -1,4 +1,4 @@
-package diskinsight;
+package diskinsight.model;
 
 import java.awt.Color;
 import java.util.HashMap;

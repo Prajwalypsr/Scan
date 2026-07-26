@@ -1,4 +1,8 @@
-package diskinsight;
+package diskinsight.dao;
+
+import diskinsight.model.FileRecord;
+import diskinsight.model.Rule;
+import diskinsight.model.ScanRecord;
 
 import java.sql.*;
 import java.util.ArrayList;

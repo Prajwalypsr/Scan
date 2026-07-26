@@ -1,4 +1,9 @@
-package diskinsight;
+package diskinsight.util;
+
+import diskinsight.dao.Database;
+import diskinsight.model.Category;
+import diskinsight.model.FileRecord;
+import diskinsight.service.FolderScanner;
 
 import java.util.ArrayList;
 import java.util.List;

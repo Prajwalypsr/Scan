@@ -1,4 +1,4 @@
-package diskinsight;
+package diskinsight.util;
 
 import java.text.NumberFormat;
 

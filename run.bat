@@ -10,11 +10,11 @@ if exist lib\*.jar (
 
 echo Compiling...
 if not exist out mkdir out
-javac -d out src\diskinsight\*.java
+javac -d out -sourcepath src src\diskinsight\ui\DiskInsightApp.java
 if errorlevel 1 goto :error
 
 echo Starting DiskInsight...
-java -cp "%CP%" diskinsight.DiskInsightApp
+java -cp "%CP%" diskinsight.ui.DiskInsightApp
 goto :eof
 
 :error

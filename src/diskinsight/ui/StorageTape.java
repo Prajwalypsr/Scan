@@ -1,4 +1,8 @@
-package diskinsight;
+package diskinsight.ui;
+
+import diskinsight.model.Category;
+import diskinsight.model.FileRecord;
+import diskinsight.util.Fmt;
 
 import java.awt.*;
 import java.awt.event.*;
