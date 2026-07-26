@@ -8,6 +8,7 @@ import diskinsight.model.ScanRecord;
 import diskinsight.service.FolderScanner;
 import diskinsight.util.DemoData;
 import diskinsight.util.Fmt;
+import diskinsight.engine.GlobalAnalyzer;
 
 import java.awt.*;
 import java.awt.event.*;
@@ -85,12 +86,9 @@ public class MainFrame extends JFrame {
 
     /** Re-evaluates every file against the enabled rules. */
     public void applyRules() {
+        GlobalAnalyzer analyzer = new GlobalAnalyzer(rules);
         for (FileRecord f : files) {
-            f.hits.clear();
-            for (Rule r : rules) {
-                if (r.enabled && r.matches(f)) f.hits.add(r);
-            }
-            f.flagged = !f.hits.isEmpty();
+            analyzer.analyze(f);
         }
     }
 

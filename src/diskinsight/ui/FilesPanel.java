@@ -272,7 +272,7 @@ public class FilesPanel extends JPanel {
             @Override
             public boolean include(Entry<? extends FilesModel, ? extends Integer> entry) {
                 FileRecord f = model.get(entry.getIdentifier());
-                if (filterRule != null && !filterRule.matches(f)) return false;
+                if (filterRule != null && !new diskinsight.engine.RuleEngine(filterRule).evaluate(f)) return false;
                 if (filterCategory != null && f.category != filterCategory) return false;
                 if (filterMinSize > 0 && f.size < filterMinSize) return false;
                 if (filterMinAge > 0 && Fmt.daysOld(f.modified) < filterMinAge) return false;

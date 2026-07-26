@@ -43,12 +43,7 @@ public class Rule {
         return out;
     }
 
-    public boolean matches(FileRecord f) {
-        if (!extensions.isEmpty() && !extensions.contains(f.extension)) return false;
-        if (minSize > 0 && f.size < minSize) return false;
-        if (olderThanDays > 0 && Fmt.daysOld(f.modified) < olderThanDays) return false;
-        return true;
-    }
+
 
     /** Plain-language summary shown under the rule name. */
     public String describe() {

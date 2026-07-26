@@ -153,7 +153,7 @@ public class OverviewPanel extends JPanel {
             int count = 0;
             long size = 0;
             for (FileRecord f : files) {
-                if (r.matches(f)) { count++; size += f.size; }
+                if (new diskinsight.engine.RuleEngine(r).evaluate(f)) { count++; size += f.size; }
             }
 
             Ui.Card card = new Ui.Card(new BorderLayout(0, Theme.S));

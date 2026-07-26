@@ -152,7 +152,7 @@ public class RulesPanel extends JPanel {
         int count = 0;
         long size = 0;
         for (FileRecord f : app.files()) {
-            if (rule.matches(f)) { count++; size += f.size; }
+            if (new diskinsight.engine.RuleEngine(rule).evaluate(f)) { count++; size += f.size; }
         }
 
         JPanel row = new JPanel(new BorderLayout(Theme.M, 0));
@@ -244,7 +244,7 @@ public class RulesPanel extends JPanel {
 
         Rule draft = new Rule(0, "preview", true, exts, size, age);
         int n = 0;
-        for (FileRecord f : app.files()) if (draft.matches(f)) n++;
+        for (FileRecord f : app.files()) if (new diskinsight.engine.RuleEngine(draft).evaluate(f)) n++;
         preview.setText("This would flag " + n + " of "
                 + Fmt.count(app.files().size()) + " files right now");
     }
