@@ -4,6 +4,8 @@ import diskinsight.model.FileRecord;
 import diskinsight.model.Rule;
 import diskinsight.model.ScanRecord;
 
+import diskinsight.exception.DatabaseConnectionException;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,8 +36,8 @@ public class Database {
     private boolean available;
     private String status = "not connected";
 
-    /** Tries to connect. Never throws — check isAvailable() afterwards. */
-    public boolean connect() {
+    /** Tries to connect. Throws DatabaseConnectionException if it fails. */
+    public boolean connect() throws DatabaseConnectionException {
         try {
             Class.forName(DRIVER);
             connection = DriverManager.getConnection(URL, USER, PASSWORD);
@@ -44,9 +46,11 @@ public class Database {
         } catch (ClassNotFoundException e) {
             available = false;
             status = "offline \u2014 MySQL driver not on the classpath";
+            throw new DatabaseConnectionException(status, e);
         } catch (SQLException e) {
             available = false;
             status = "offline \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
         return available;
     }
@@ -66,7 +70,7 @@ public class Database {
        ================================================================== */
 
     /** Saves a completed scan and its files. Returns the new scan id, or -1. */
-    public int saveScan(String folder, List<FileRecord> files) {
+    public int saveScan(String folder, List<FileRecord> files) throws DatabaseConnectionException {
         if (!available) return -1;
 
         long total = 0, flagged = 0;
@@ -122,12 +126,12 @@ public class Database {
         } catch (SQLException e) {
             rollback();
             status = "save failed \u2014 " + e.getMessage();
-            return -1;
+            throw new DatabaseConnectionException(status, e);
         }
     }
 
     /** Reads back the files of a saved scan. */
-    public List<FileRecord> loadFiles(int scanId) {
+    public List<FileRecord> loadFiles(int scanId) throws DatabaseConnectionException {
         List<FileRecord> out = new ArrayList<>();
         if (!available) return out;
 
@@ -147,11 +151,12 @@ public class Database {
             }
         } catch (SQLException e) {
             status = "load failed \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
         return out;
     }
 
-    public List<ScanRecord> loadHistory(int limit) {
+    public List<ScanRecord> loadHistory(int limit) throws DatabaseConnectionException {
         List<ScanRecord> out = new ArrayList<>();
         if (!available) return out;
 
@@ -173,6 +178,7 @@ public class Database {
             }
         } catch (SQLException e) {
             status = "history failed \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
         return out;
     }
@@ -181,7 +187,7 @@ public class Database {
        Rules
        ================================================================== */
 
-    public List<Rule> loadRules() {
+    public List<Rule> loadRules() throws DatabaseConnectionException {
         List<Rule> out = new ArrayList<>();
         if (!available) return out;
 
@@ -200,11 +206,12 @@ public class Database {
             }
         } catch (SQLException e) {
             status = "rules failed \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
         return out;
     }
 
-    public void saveRule(Rule r) {
+    public void saveRule(Rule r) throws DatabaseConnectionException {
         if (!available) return;
         String sql = "INSERT INTO rules "
                 + "(rule_id, rule_name, enabled, extensions, min_size, older_than_days) "
@@ -222,10 +229,11 @@ public class Database {
             ps.executeUpdate();
         } catch (SQLException e) {
             status = "rule save failed \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
     }
 
-    public void deleteRule(int ruleId) {
+    public void deleteRule(int ruleId) throws DatabaseConnectionException {
         if (!available) return;
         try (PreparedStatement ps = connection.prepareStatement(
                 "DELETE FROM rules WHERE rule_id = ?")) {
@@ -233,6 +241,7 @@ public class Database {
             ps.executeUpdate();
         } catch (SQLException e) {
             status = "rule delete failed \u2014 " + e.getMessage();
+            throw new DatabaseConnectionException(status, e);
         }
     }
 

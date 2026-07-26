@@ -202,7 +202,7 @@ public class RulesPanel extends JPanel {
 
     /* ------------------------------------------------------------------ */
 
-    private long parseSize() {
+    private long parseSize() throws diskinsight.exception.RuleValidationException {
         String raw = sizeField.getText().trim();
         if (raw.isEmpty()) return 0;
         try {
@@ -214,59 +214,60 @@ public class RulesPanel extends JPanel {
             };
             return Math.round(v * unit);
         } catch (NumberFormatException e) {
-            return -1; // signals "not a number"
+            throw new diskinsight.exception.RuleValidationException("The size has to be a number, for example 500.", e);
         }
     }
 
-    private int parseAge() {
+    private int parseAge() throws diskinsight.exception.RuleValidationException {
         String raw = ageField.getText().trim();
         if (raw.isEmpty()) return 0;
         try {
             return Integer.parseInt(raw);
         } catch (NumberFormatException e) {
-            return -1;
+            throw new diskinsight.exception.RuleValidationException("The age has to be a whole number of days, for example 30.", e);
         }
     }
 
     private void updatePreview() {
-        long size = parseSize();
-        int age = parseAge();
-        String exts = extField.getText().trim();
+        try {
+            long size = parseSize();
+            int age = parseAge();
+            String exts = extField.getText().trim();
 
-        if (size < 0 || age < 0) {
-            preview.setText("");
-            return;
-        }
-        if (exts.isEmpty() && size == 0 && age == 0) {
-            preview.setText("");
-            return;
-        }
+            if (exts.isEmpty() && size == 0 && age == 0) {
+                preview.setText("");
+                return;
+            }
 
-        Rule draft = new Rule(0, "preview", true, exts, size, age);
-        int n = 0;
-        for (FileRecord f : app.files()) if (new diskinsight.engine.RuleEngine(draft).evaluate(f)) n++;
-        preview.setText("This would flag " + n + " of "
-                + Fmt.count(app.files().size()) + " files right now");
+            Rule draft = new Rule(0, "preview", true, exts, size, age);
+            int n = 0;
+            for (FileRecord f : app.files()) if (new diskinsight.engine.RuleEngine(draft).evaluate(f)) n++;
+            preview.setText("This would flag " + n + " of "
+                    + Fmt.count(app.files().size()) + " files right now");
+        } catch (diskinsight.exception.RuleValidationException e) {
+            preview.setText("");
+        }
     }
 
     private void addRule() {
         String name = nameField.getText().trim();
-        long size = parseSize();
-        int age = parseAge();
         String exts = extField.getText().trim();
 
         if (name.isEmpty()) {
             fail("Give the rule a name so you can recognise it later.", nameField);
             return;
         }
-        if (size < 0) {
-            fail("The size has to be a number, for example 500.", sizeField);
+
+        long size = 0;
+        int age = 0;
+        try {
+            size = parseSize();
+            age = parseAge();
+        } catch (diskinsight.exception.RuleValidationException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(), "Invalid Input", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        if (age < 0) {
-            fail("The age has to be a whole number of days, for example 30.", ageField);
-            return;
-        }
+
         if (exts.isEmpty() && size == 0 && age == 0) {
             fail("Set at least one condition \u2014 a file type, a size, or an age.", extField);
             return;

@@ -101,8 +101,21 @@ public class MainFrame extends JFrame {
         for (TabButton t : tabs) t.refreshCount();
     }
 
-    public void saveRule(Rule r)   { database.saveRule(r); }
-    public void deleteRule(Rule r) { database.deleteRule(r.id); }
+    public void saveRule(Rule r) {
+        try {
+            database.saveRule(r);
+        } catch (diskinsight.exception.DatabaseConnectionException e) {
+            JOptionPane.showMessageDialog(this, "Failed to save rule: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void deleteRule(Rule r) {
+        try {
+            database.deleteRule(r.id);
+        } catch (diskinsight.exception.DatabaseConnectionException e) {
+            JOptionPane.showMessageDialog(this, "Failed to delete rule: " + e.getMessage(), "Database Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     public void showFilesForCategory(Category c) {
         filesPanel.showCategory(c);
@@ -245,11 +258,15 @@ public class MainFrame extends JFrame {
        ================================================================== */
 
     private void connectDatabase() {
-        database.connect();
-        if (database.isAvailable()) {
-            List<Rule> saved = database.loadRules();
-            if (!saved.isEmpty()) rules = saved;
-            history.addAll(database.loadHistory(20));
+        try {
+            database.connect();
+            if (database.isAvailable()) {
+                List<Rule> saved = database.loadRules();
+                if (!saved.isEmpty()) rules = saved;
+                history.addAll(database.loadHistory(20));
+            }
+        } catch (diskinsight.exception.DatabaseConnectionException e) {
+            // Handled naturally by offline degradation and status reporting
         }
     }
 
@@ -330,8 +347,14 @@ public class MainFrame extends JFrame {
             total += f.size;
             if (f.flagged) flagged += f.size;
         }
-        int id = database.saveScan(folder, files);
-        history.add(0, new ScanRecord(id, folder, scannedAt, files.size(), total, flagged));
+        try {
+            int id = database.saveScan(folder, files);
+            if (id != -1) {
+                history.add(0, new ScanRecord(id, folder, scannedAt, files.size(), total, flagged));
+            }
+        } catch (diskinsight.exception.DatabaseConnectionException e) {
+            // Skip history update if database save fails
+        }
 
         int skipped = activeScan == null ? 0 : activeScan.getSkipped();
         updateStatus(skipped > 0
@@ -343,11 +366,11 @@ public class MainFrame extends JFrame {
         setView("overview");
     }
 
-    private void onScanFailed(String message) {
+    private void onScanFailed(diskinsight.exception.DiskInsightException exception) {
         scanning.end();
         scanButton.setEnabled(true);
         setView("overview");
-        JOptionPane.showMessageDialog(this, message, "Scan stopped",
+        JOptionPane.showMessageDialog(this, exception.getMessage(), "Scan stopped",
                 JOptionPane.WARNING_MESSAGE);
     }
 

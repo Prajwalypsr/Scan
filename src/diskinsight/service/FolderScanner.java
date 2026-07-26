@@ -1,6 +1,8 @@
 package diskinsight.service;
 
 import diskinsight.model.FileRecord;
+import diskinsight.exception.DiskInsightException;
+import diskinsight.exception.InvalidDirectoryException;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -23,7 +25,7 @@ public class FolderScanner extends SwingWorker<List<FileRecord>, String> {
     private final boolean includeSubfolders;
     private final Consumer<String> onProgress;
     private final Consumer<List<FileRecord>> onFinished;
-    private final Consumer<String> onFailed;
+    private final Consumer<DiskInsightException> onFailed;
 
     private int found = 0;
     private int skipped = 0;
@@ -32,7 +34,7 @@ public class FolderScanner extends SwingWorker<List<FileRecord>, String> {
                          boolean includeSubfolders,
                          Consumer<String> onProgress,
                          Consumer<List<FileRecord>> onFinished,
-                         Consumer<String> onFailed) {
+                         Consumer<DiskInsightException> onFailed) {
         this.root = root;
         this.includeSubfolders = includeSubfolders;
         this.onProgress = onProgress;
@@ -41,12 +43,13 @@ public class FolderScanner extends SwingWorker<List<FileRecord>, String> {
     }
 
     @Override
-    protected List<FileRecord> doInBackground() throws Exception {
+    protected List<FileRecord> doInBackground() throws InvalidDirectoryException {
         List<FileRecord> files = new ArrayList<>();
         int maxDepth = includeSubfolders ? Integer.MAX_VALUE : 1;
 
-        Files.walkFileTree(root, java.util.EnumSet.noneOf(FileVisitOption.class), maxDepth,
-            new SimpleFileVisitor<Path>() {
+        try {
+            Files.walkFileTree(root, java.util.EnumSet.noneOf(FileVisitOption.class), maxDepth,
+                new SimpleFileVisitor<Path>() {
 
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) {
@@ -72,6 +75,9 @@ public class FolderScanner extends SwingWorker<List<FileRecord>, String> {
                     return FileVisitResult.CONTINUE;
                 }
             });
+        } catch (IOException | SecurityException e) {
+            throw new InvalidDirectoryException("Failed to scan directory: " + root.toString(), e);
+        }
 
         return files;
     }
@@ -88,10 +94,11 @@ public class FolderScanner extends SwingWorker<List<FileRecord>, String> {
             onFinished.accept(get());
         } catch (Exception e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
-            String message = cause.getMessage() == null
-                    ? cause.getClass().getSimpleName()
-                    : cause.getMessage();
-            onFailed.accept("That folder could not be read: " + message);
+            if (cause instanceof InvalidDirectoryException) {
+                onFailed.accept((InvalidDirectoryException) cause);
+            } else {
+                onFailed.accept(new DiskInsightException("Unexpected error during scan: " + cause.getMessage(), cause));
+            }
         }
     }
 
