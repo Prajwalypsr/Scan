@@ -6,7 +6,6 @@ import diskinsight.model.FileRecord;
 import diskinsight.model.Rule;
 import diskinsight.model.ScanRecord;
 import diskinsight.service.FolderScanner;
-import diskinsight.util.DemoData;
 import diskinsight.util.Fmt;
 import diskinsight.engine.GlobalAnalyzer;
 
@@ -31,9 +30,9 @@ public class MainFrame extends JFrame {
     private List<FileRecord> files = new ArrayList<>();
     private List<Rule> rules = Rule.defaults();
     private final List<ScanRecord> history = new ArrayList<>();
-    private String folder = DemoData.SAMPLE_FOLDER;
+    private String folder = "none";
     private long scannedAt = System.currentTimeMillis();
-    private boolean usingSampleData = true;
+    private long scanStartTime = 0;
 
     private final Database database = new Database();
     private FolderScanner activeScan;
@@ -46,9 +45,11 @@ public class MainFrame extends JFrame {
     private final ScanningPanel scanning = new ScanningPanel();
 
     /* ---- chrome ---- */
+    private final CardLayout rootCards = new CardLayout();
+    private final JPanel rootContent = new JPanel(rootCards);
     private final CardLayout cards = new CardLayout();
     private final JPanel content = new JPanel(cards);
-    private final JLabel folderLabel = Ui.mono(DemoData.SAMPLE_FOLDER);
+    private final JLabel folderLabel = Ui.mono("none");
     private final JLabel statusLabel = Ui.hint("");
     private final List<TabButton> tabs = new ArrayList<>();
     private final Ui.Btn scanButton = Ui.primary("Scan folder");
@@ -60,18 +61,25 @@ public class MainFrame extends JFrame {
         setMinimumSize(new Dimension(1020, 680));
         setLocationRelativeTo(null);
         getContentPane().setBackground(Theme.PAPER);
-        setLayout(new BorderLayout());
+        JPanel dashboardPanel = new JPanel(new BorderLayout());
+        dashboardPanel.setOpaque(false);
+        dashboardPanel.add(buildTopBar(), BorderLayout.NORTH);
+        dashboardPanel.add(buildBody(), BorderLayout.CENTER);
+        dashboardPanel.add(buildFooter(), BorderLayout.SOUTH);
+        
+        rootContent.setOpaque(false);
+        rootContent.add(new WelcomePanel(this), "welcome");
+        rootContent.add(dashboardPanel, "dashboard");
 
-        add(buildTopBar(), BorderLayout.NORTH);
-        add(buildBody(), BorderLayout.CENTER);
-        add(buildFooter(), BorderLayout.SOUTH);
+        setLayout(new BorderLayout());
+        add(rootContent, BorderLayout.CENTER);
 
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent e) { database.close(); }
         });
 
         connectDatabase();
-        loadSampleFolder();
+        rootCards.show(rootContent, "welcome");
     }
 
     /* ==================================================================
@@ -176,11 +184,6 @@ public class MainFrame extends JFrame {
         gc.fill = GridBagConstraints.NONE;
         gc.insets = new Insets(0, Theme.S, 0, 0);
 
-        Ui.Btn sample = Ui.ghost("Load sample folder");
-        sample.addActionListener(e -> loadSampleFolder());
-        gc.gridx = 4;
-        bar.add(sample, gc);
-
         Ui.Btn choose = Ui.ghost("Choose folder\u2026");
         choose.addActionListener(e -> chooseFolder());
         gc.gridx = 5;
@@ -270,46 +273,7 @@ public class MainFrame extends JFrame {
         }
     }
 
-    /** Loads the built-in sample folder so the screens can be demonstrated. */
-    private void loadSampleFolder() {
-        files = DemoData.sampleFolder();
-        folder = DemoData.SAMPLE_FOLDER;
-        scannedAt = System.currentTimeMillis();
-        usingSampleData = true;
-        folderLabel.setText(folder + "   (sample data)");
-
-        applyRules();
-        history.clear();
-        history.addAll(sampleHistory());
-        updateStatus("Showing sample data \u2014 choose a folder to scan your own files");
-        refreshAll();
-        setView("overview");
-    }
-
-    /** Illustrative earlier scans, shown only for the sample folder. */
-    private List<ScanRecord> sampleHistory() {
-        List<ScanRecord> out = new ArrayList<>();
-        long total = 0, flagged = 0;
-        for (FileRecord f : files) {
-            total += f.size;
-            if (f.flagged) flagged += f.size;
-        }
-        out.add(new ScanRecord(0, folder, scannedAt, files.size(), total, flagged));
-
-        Random r = new Random(21);
-        long size = total;
-        int count = files.size();
-        long[] daysBack = {3, 14, 30, 90};
-        for (long d : daysBack) {
-            size = Math.round(size * (0.86 + r.nextDouble() * 0.11));
-            count = (int) Math.round(count * (0.88 + r.nextDouble() * 0.09));
-            out.add(new ScanRecord(0, folder, scannedAt - d * Fmt.DAY, count, size,
-                    Math.round(size * (0.10 + r.nextDouble() * 0.20))));
-        }
-        return out;
-    }
-
-    private void chooseFolder() {
+    public void chooseFolder() {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Choose a folder to scan");
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -319,10 +283,12 @@ public class MainFrame extends JFrame {
     }
 
     private void startScan(Path root) {
+        scanStartTime = System.currentTimeMillis();
         folder = root.toString();
         folderLabel.setText(folder);
         scanButton.setEnabled(false);
         scanning.begin(folder);
+        rootCards.show(rootContent, "dashboard");
         setView("scanning");
 
         activeScan = new FolderScanner(
@@ -335,11 +301,11 @@ public class MainFrame extends JFrame {
     }
 
     private void onScanFinished(List<FileRecord> found) {
+        long durationMs = System.currentTimeMillis() - scanStartTime;
         scanning.end();
         scanButton.setEnabled(true);
         files = found;
         scannedAt = System.currentTimeMillis();
-        usingSampleData = false;
         applyRules();
 
         long total = 0, flagged = 0;
@@ -348,12 +314,19 @@ public class MainFrame extends JFrame {
             if (f.flagged) flagged += f.size;
         }
         try {
-            int id = database.saveScan(folder, files);
+            int id = database.saveScan(folder, files, durationMs);
             if (id != -1) {
-                history.add(0, new ScanRecord(id, folder, scannedAt, files.size(), total, flagged));
+                history.add(0, new ScanRecord(id, folder, scannedAt, files.size(), total, flagged, durationMs));
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                        "Scan finished, but could not be saved because the database is offline.\n" +
+                        "Status: " + database.getStatus(), 
+                        "Database Offline", JOptionPane.WARNING_MESSAGE);
             }
         } catch (diskinsight.exception.DatabaseConnectionException e) {
-            // Skip history update if database save fails
+            JOptionPane.showMessageDialog(this, 
+                    "Failed to save scan to database:\n" + e.getMessage(), 
+                    "Database Error", JOptionPane.ERROR_MESSAGE);
         }
 
         int skipped = activeScan == null ? 0 : activeScan.getSkipped();

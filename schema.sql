@@ -5,8 +5,8 @@
 --      mysql -u root -p < schema.sql
 --
 --  Three tables:
---    scans  — one row per completed scan (the Scan history screen)
---    files  — every file found during a scan
+--    ScanSessions — one row per completed scan (the Scan history screen)
+--    FileIndex  — every file found during a scan
 --    rules  — the cleanup rules, so they survive a restart
 -- ============================================================
 
@@ -20,13 +20,14 @@ USE diskinsight;
 -- ------------------------------------------------------------
 -- One completed scan of one folder
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS scans (
+CREATE TABLE IF NOT EXISTS ScanSessions (
     scan_id      INT AUTO_INCREMENT PRIMARY KEY,
     folder_path  VARCHAR(512)  NOT NULL,
     scanned_at   DATETIME      NOT NULL,
     file_count   INT           NOT NULL DEFAULT 0,
     total_size   BIGINT        NOT NULL DEFAULT 0,  -- bytes
     flagged_size BIGINT        NOT NULL DEFAULT 0,  -- bytes matched by rules
+    duration_ms  BIGINT        NOT NULL DEFAULT 0,
 
     INDEX idx_scans_folder (folder_path),
     INDEX idx_scans_when   (scanned_at)
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS scans (
 -- size_bytes is BIGINT, not INT: an INT stops at 2.1 GB and a
 -- single video file can be larger than that.
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS files (
+CREATE TABLE IF NOT EXISTS FileIndex (
     file_id       BIGINT AUTO_INCREMENT PRIMARY KEY,
     scan_id       INT           NOT NULL,
     file_name     VARCHAR(512)  NOT NULL,
@@ -50,7 +51,7 @@ CREATE TABLE IF NOT EXISTS files (
     folder_path   VARCHAR(512)  NOT NULL,
 
     CONSTRAINT fk_files_scan
-        FOREIGN KEY (scan_id) REFERENCES scans (scan_id)
+        FOREIGN KEY (scan_id) REFERENCES ScanSessions (scan_id)
         ON DELETE CASCADE,
 
     INDEX idx_files_scan      (scan_id),
@@ -97,28 +98,28 @@ ON DUPLICATE KEY UPDATE rule_name = VALUES(rule_name);
 
 -- The largest files in the most recent scan
 --   SELECT file_name, folder_path, size_bytes
---   FROM files
---   WHERE scan_id = (SELECT MAX(scan_id) FROM scans)
+--   FROM FileIndex
+--   WHERE scan_id = (SELECT MAX(scan_id) FROM ScanSessions)
 --   ORDER BY size_bytes DESC
 --   LIMIT 20;
 
 -- Space used per category
 --   SELECT category, COUNT(*) AS files, SUM(size_bytes) AS bytes
---   FROM files
---   WHERE scan_id = (SELECT MAX(scan_id) FROM scans)
+--   FROM FileIndex
+--   WHERE scan_id = (SELECT MAX(scan_id) FROM ScanSessions)
 --   GROUP BY category
 --   ORDER BY bytes DESC;
 
 -- Files matched by rule 2 (stale temporary files), evaluated in SQL
 --   SELECT f.file_name, f.size_bytes, f.last_modified
---   FROM files f
+--   FROM FileIndex f
 --   JOIN rules r ON r.rule_id = 2
---   WHERE f.scan_id = (SELECT MAX(scan_id) FROM scans)
+--   WHERE f.scan_id = (SELECT MAX(scan_id) FROM ScanSessions)
 --     AND FIND_IN_SET(f.extension, r.extensions)
 --     AND f.last_modified < NOW() - INTERVAL r.older_than_days DAY;
 
 -- Is the folder growing?
---   SELECT folder_path, scanned_at, file_count, total_size
---   FROM scans
+--   SELECT folder_path, scanned_at, file_count, total_size, duration_ms
+--   FROM ScanSessions
 --   ORDER BY scanned_at DESC
 --   LIMIT 10;

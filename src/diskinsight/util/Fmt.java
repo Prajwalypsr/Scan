@@ -60,4 +60,13 @@ public final class Fmt {
         if (total <= 0) return "0%";
         return String.format("%.1f%%", part * 100.0 / total);
     }
+
+    /** Formats milliseconds into a readable duration, e.g., "300ms", "2.4s", "1m 12s". */
+    public static String duration(long ms) {
+        if (ms < 1000) return ms + "ms";
+        if (ms < 60000) return String.format("%.1fs", ms / 1000.0);
+        long mins = ms / 60000;
+        long secs = (ms % 60000) / 1000;
+        return mins + "m " + secs + "s";
+    }
 }

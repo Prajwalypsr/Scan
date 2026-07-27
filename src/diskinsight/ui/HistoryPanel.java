@@ -91,9 +91,12 @@ public class HistoryPanel extends JPanel {
         row.add(Ui.mono(Fmt.bytes(scan.totalSize)), gc);
 
         gc.gridx = 4;
+        row.add(Ui.mono(Fmt.duration(scan.durationMs)), gc);
+
+        gc.gridx = 5;
         row.add(buildDelta(scan, previous, latest), gc);
 
-        gc.gridx = 5; gc.insets = new Insets(0, 0, 0, 0);
+        gc.gridx = 6; gc.insets = new Insets(0, 0, 0, 0);
         row.add(Ui.mono(Fmt.bytes(scan.flaggedSize) + " worth reviewing"), gc);
 
         return row;

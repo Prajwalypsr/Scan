@@ -10,6 +10,8 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import diskinsight.util.DatabaseConnection;
+
 /**
  * MySQL storage for scans, files and rules.
  *
@@ -21,16 +23,9 @@ import java.util.List;
  * To switch it on:
  *   1. run schema.sql on your MySQL server
  *   2. put mysql-connector-j-x.x.x.jar on the classpath
- *   3. edit the four constants below
+ *   3. edit the db.properties file
  */
 public class Database {
-
-    /* ---- connection settings ---- */
-    public static final String URL =
-            "jdbc:mysql://localhost:3306/diskinsight?useSSL=false&serverTimezone=UTC";
-    public static final String USER = "root";
-    public static final String PASSWORD = "";
-    public static final String DRIVER = "com.mysql.cj.jdbc.Driver";
 
     private Connection connection;
     private boolean available;
@@ -39,15 +34,10 @@ public class Database {
     /** Tries to connect. Throws DatabaseConnectionException if it fails. */
     public boolean connect() throws DatabaseConnectionException {
         try {
-            Class.forName(DRIVER);
-            connection = DriverManager.getConnection(URL, USER, PASSWORD);
+            connection = DatabaseConnection.getConnection();
             available = true;
             status = "connected to " + connection.getCatalog();
-        } catch (ClassNotFoundException e) {
-            available = false;
-            status = "offline \u2014 MySQL driver not on the classpath";
-            throw new DatabaseConnectionException(status, e);
-        } catch (SQLException e) {
+        } catch (Exception e) {
             available = false;
             status = "offline \u2014 " + e.getMessage();
             throw new DatabaseConnectionException(status, e);
@@ -70,7 +60,7 @@ public class Database {
        ================================================================== */
 
     /** Saves a completed scan and its files. Returns the new scan id, or -1. */
-    public int saveScan(String folder, List<FileRecord> files) throws DatabaseConnectionException {
+    public int saveScan(String folder, List<FileRecord> files, long durationMs) throws DatabaseConnectionException {
         if (!available) return -1;
 
         long total = 0, flagged = 0;
@@ -79,10 +69,10 @@ public class Database {
             if (f.flagged) flagged += f.size;
         }
 
-        String insertScan = "INSERT INTO scans "
-                + "(folder_path, scanned_at, file_count, total_size, flagged_size) "
-                + "VALUES (?, ?, ?, ?, ?)";
-        String insertFile = "INSERT INTO files "
+        String insertScan = "INSERT INTO ScanSessions "
+                + "(folder_path, scanned_at, file_count, total_size, flagged_size, duration_ms) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+        String insertFile = "INSERT INTO FileIndex "
                 + "(scan_id, file_name, extension, category, size_bytes, "
                 + " last_modified, folder_path) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
@@ -97,6 +87,7 @@ public class Database {
                 ps.setInt(3, files.size());
                 ps.setLong(4, total);
                 ps.setLong(5, flagged);
+                ps.setLong(6, durationMs);
                 ps.executeUpdate();
                 try (ResultSet keys = ps.getGeneratedKeys()) {
                     scanId = keys.next() ? keys.getInt(1) : -1;
@@ -136,7 +127,7 @@ public class Database {
         if (!available) return out;
 
         String sql = "SELECT file_id, file_name, size_bytes, last_modified, folder_path "
-                   + "FROM files WHERE scan_id = ? ORDER BY size_bytes DESC";
+                   + "FROM FileIndex WHERE scan_id = ? ORDER BY size_bytes DESC";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, scanId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -161,7 +152,7 @@ public class Database {
         if (!available) return out;
 
         String sql = "SELECT scan_id, folder_path, scanned_at, file_count, "
-                   + "total_size, flagged_size FROM scans "
+                   + "total_size, flagged_size, duration_ms FROM ScanSessions "
                    + "ORDER BY scanned_at DESC LIMIT ?";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setInt(1, limit);
@@ -173,7 +164,8 @@ public class Database {
                             rs.getTimestamp("scanned_at").getTime(),
                             rs.getInt("file_count"),
                             rs.getLong("total_size"),
-                            rs.getLong("flagged_size")));
+                            rs.getLong("flagged_size"),
+                            rs.getLong("duration_ms")));
                 }
             }
         } catch (SQLException e) {
